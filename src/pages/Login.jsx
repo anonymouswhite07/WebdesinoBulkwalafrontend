@@ -43,8 +43,19 @@ const Login = () => {
     // Only run this check once
     if (!hasCheckedAuth) {
       setHasCheckedAuth(true);
+      // Check if we're on mobile Safari
+      const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      
+      if (isIOS || isSafari) {
+        console.log("Login page: Detected iOS/Safari, checking auth state");
+      }
+      
       if (isLoggedIn) {
         // User is already logged in, redirect to home
+        if (isIOS || isSafari) {
+          console.log("Login page: User already logged in, redirecting to home");
+        }
         navigate("/", { replace: true });
       }
     }

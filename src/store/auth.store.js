@@ -22,6 +22,82 @@ import {
 import { create } from "zustand";
 import useCartStore from "./cart.store";
 
+// Helper functions for localStorage with mobile Safari handling
+const getStoredAuthState = () => {
+  if (typeof window === "undefined") return null;
+  
+  try {
+    // Check if we're on mobile Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (isIOS || isSafari) {
+      console.log("Auth store: Detected iOS/Safari, checking localStorage for auth state");
+    }
+    
+    const stored = localStorage.getItem("auth_state");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Validate the stored state
+      if (parsed && typeof parsed === 'object' && parsed.user && parsed.timestamp) {
+        // Check if the stored state is not too old (e.g., 1 day)
+        const oneDay = 24 * 60 * 60 * 1000;
+        if (Date.now() - parsed.timestamp < oneDay) {
+          if (isIOS || isSafari) {
+            console.log("Auth store: Found valid stored auth state", parsed.user._id);
+          }
+          return { user: parsed.user, isLoggedIn: true };
+        } else {
+          if (isIOS || isSafari) {
+            console.log("Auth store: Stored auth state is too old, ignoring");
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Auth store: Error reading stored auth state", error);
+  }
+  
+  return null;
+};
+
+const setStoredAuthState = (user) => {
+  if (typeof window === "undefined") return;
+  
+  try {
+    // Check if we're on mobile Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (user && typeof user === 'object') {
+      const stateToStore = {
+        user: { 
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isVerified: user.isVerified
+        },
+        timestamp: Date.now()
+      };
+      
+      localStorage.setItem("auth_state", JSON.stringify(stateToStore));
+      
+      if (isIOS || isSafari) {
+        console.log("Auth store: Saved auth state to localStorage", user._id);
+      }
+    } else {
+      localStorage.removeItem("auth_state");
+      
+      if (isIOS || isSafari) {
+        console.log("Auth store: Removed auth state from localStorage");
+      }
+    }
+  } catch (error) {
+    console.warn("Auth store: Error saving auth state to localStorage", error);
+  }
+};
+
 export const useAuthStore = create((set, get) => ({
   user: null,
   isLoggedIn: false,
@@ -78,6 +154,9 @@ export const useAuthStore = create((set, get) => ({
         isLoading: false,
         error: null,
       });
+      
+      // Save auth state to localStorage for mobile Safari
+      setStoredAuthState(userData);
 
       // ✅ Merge guest cart with backend cart after login
       await useCartStore.getState().mergeGuestCart();
@@ -131,6 +210,9 @@ export const useAuthStore = create((set, get) => ({
     try {
       const user = await verifyOtpService(data);
       set({ user, isLoggedIn: true, isLoading: false });
+      
+      // Save auth state to localStorage for mobile Safari
+      setStoredAuthState(user);
 
       // ✅ Merge guest cart with backend cart after OTP login
       await useCartStore.getState().mergeGuestCart();
@@ -152,6 +234,9 @@ export const useAuthStore = create((set, get) => ({
       clearCartOnLogout();
 
       set({ user: null, isLoggedIn: false, isLoading: false, error: null });
+      
+      // Clear auth state from localStorage
+      setStoredAuthState(null);
 
       return { success: true };
     } catch (apiError) {
@@ -168,6 +253,10 @@ export const useAuthStore = create((set, get) => ({
         isLoading: false,
         error: errorMessage,
       });
+      
+      // Clear auth state from localStorage
+      setStoredAuthState(null);
+
       return { success: false, error: errorMessage };
     }
   },
@@ -184,6 +273,9 @@ export const useAuthStore = create((set, get) => ({
       const updatedUser = await updateShippingAddressService(payload);
 
       set({ user: updatedUser, isLoading: false });
+      
+      // Update stored auth state
+      setStoredAuthState(updatedUser);
 
       return { success: true, user: updatedUser };
     } catch (error) {
@@ -203,6 +295,10 @@ export const useAuthStore = create((set, get) => ({
     try {
       const updatedUser = await deleteAddressService(index);
       set({ user: updatedUser, isLoading: false });
+      
+      // Update stored auth state
+      setStoredAuthState(updatedUser);
+
       return { success: true };
     } catch (error) {
       const message =
@@ -219,18 +315,32 @@ export const useAuthStore = create((set, get) => ({
     set({ isLoading: true });
 
     try {
+      // First, check if we have stored auth state (especially for mobile Safari)
+      const storedState = getStoredAuthState();
+      if (storedState) {
+        // Set the stored state temporarily while we verify with the server
+        set({ user: storedState.user, isLoggedIn: true, isLoading: true });
+      }
+
       const user = await checkauthService();
       if (user) {
         set({ user, isLoggedIn: true });
+        // Save the verified auth state
+        setStoredAuthState(user);
       } else {
         set({ user: null, isLoggedIn: false });
+        // Clear stored auth state
+        setStoredAuthState(null);
       }
     } catch (error) {
       console.error("Auth check failed:", error.message);
-      // Only set user to null if it's not already null to prevent unnecessary state changes
+      // On error, we'll keep the stored state if we had it, but mark as not logged in
+      // This helps with mobile Safari where network requests might fail
       const currentState = get();
       if (currentState.user !== null || currentState.isLoggedIn !== false) {
         set({ user: null, isLoggedIn: false });
+        // Clear stored auth state
+        setStoredAuthState(null);
       }
     } finally {
       set({ isLoading: false });
@@ -318,6 +428,10 @@ export const useAuthStore = create((set, get) => ({
     try {
       const user = await applySellerService(sellerData);
       set({ user, isLoading: false });
+      
+      // Update stored auth state
+      setStoredAuthState(user);
+
       return { success: true, user };
     } catch (error) {
       const message =
@@ -362,6 +476,10 @@ export const useAuthStore = create((set, get) => ({
     try {
       const updatedUser = await updateProfileService(profileData);
       set({ user: updatedUser, isLoading: false });
+      
+      // Update stored auth state
+      setStoredAuthState(updatedUser);
+
       return { success: true, user: updatedUser };
     } catch (error) {
       const message =
