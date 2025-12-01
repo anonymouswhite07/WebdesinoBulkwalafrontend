@@ -14,19 +14,25 @@ export const registerSellerService = async (sellerData) => {
 };
 
 export const loginService = async (credentials) => {
-  const res = await axiosInstance.post("/users/login", credentials);
+  const res = await axiosInstance.post("/users/login", credentials, {
+    withCredentials: true,
+  });
   return res.data.data;
 };
 
 // Send OTP
 export const sendOtpService = async (phone) => {
-  const res = await axiosInstance.post("/users/send-otp", { phone });
+  const res = await axiosInstance.post("/users/send-otp", { phone }, {
+    withCredentials: true,
+  });
   return res.data;
 };
 
 // Verify OTP
 export const verifyOtpService = async (data) => {
-  const res = await axiosInstance.post("/users/verify-otp", data);
+  const res = await axiosInstance.post("/users/verify-otp", data, {
+    withCredentials: true,
+  });
   return res.data.data; // returns user
 };
 
@@ -65,28 +71,34 @@ export const checkauthService = async () => {
 export const verifyEmailService = async ({ userid, token }) => {
   const res = await axiosInstance.post(`/users/verify/${userid}`, {
     token,
+  }, {
+    withCredentials: true,
   });
   return res.data;
 };
 
 export const resendVerificationService = async (userid) => {
   const res = await axiosInstance.post(
-    `/users/resend-verification/${userid}`
+    `/users/resend-verification/${userid}`,
+    {},
+    {
+      withCredentials: true,
+    }
   );
   return res.data;
 };
 
-export const logoutService = async () => {
-  await axiosInstance.post("/users/logout");
-  return { success: true };
-};
-
 export const forgotPasswordService = async (email) => {
-  const res = await axiosInstance.post("/users/forget-password", { email });
+  const res = await axiosInstance.post("/users/forget-password", { email }, {
+    withCredentials: true,
+  });
   return res.data;
 };
+
 export const changePasswordService = async (email) => {
-  const res = await axiosInstance.post("/users/change-password", { email });
+  const res = await axiosInstance.post("/users/change-password", { email }, {
+    withCredentials: true,
+  });
   return res.data;
 };
 
@@ -94,7 +106,10 @@ export const resetPasswordService = async (credentials) => {
   const { userid, token, newPassword } = credentials;
   const res = await axiosInstance.post(
     `/users/reset-password/${userid}/${token}`,
-    { newPassword }
+    { newPassword },
+    {
+      withCredentials: true,
+    }
   );
   return res.data;
 };
@@ -139,4 +154,12 @@ export const updateProfileService = async (profileData) => {
     withCredentials: true,
   });
   return res.data.data;
+};
+
+// Logout service
+export const logoutService = async () => {
+  await axiosInstance.post("/users/logout", {}, {
+    withCredentials: true,
+  });
+  return { success: true };
 };
