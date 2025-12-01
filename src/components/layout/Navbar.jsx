@@ -121,45 +121,42 @@ export default function Navbar() {
       typeof queryInput === "function" ? queryInput(searchQuery) : queryInput;
     if (!query.trim()) return;
 
-    const keyword = query.toLowerCase().replace(/\s+/g, "");
-    const filtered = products.filter((p) => {
-      const normalize = (str) => (str || "").toLowerCase().replace(/\s+/g, "");
-      return (
-        normalize(p.title).includes(keyword) ||
-        normalize(p.description).includes(keyword) ||
-        normalize(p.category?.name).includes(keyword) ||
-        normalize(p.subcategory?.name).includes(keyword) ||
-        (p.sku && normalize(p.sku).includes(keyword)) // Add SKU search
-      );
-    });
-
-    // Sort results to prioritize exact matches and SKU matches
-    const sortedResults = [...filtered].sort((a, b) => {
-      const aTitle = (a.title || "").toLowerCase();
-      const bTitle = (b.title || "").toLowerCase();
-      const aSku = (a.sku || "").toLowerCase();
-      const bSku = (b.sku || "").toLowerCase();
+    // Apply scoring logic to sort results by relevance
+    const keyword = query.toLowerCase().trim();
+    
+    const scoredProducts = products.map(product => {
+      const title = (product.title || "").toLowerCase();
+      const sku = (product.sku || "").toLowerCase();
+      const description = (product.description || "").toLowerCase();
+      const category = (product.category?.name || "").toLowerCase();
+      const subcategory = (product.subcategory?.name || "").toLowerCase();
       
-      // Prioritize SKU exact matches
-      if (aSku === keyword) return -1;
-      if (bSku === keyword) return 1;
+      let score = 0;
       
-      // Prioritize title exact matches
-      if (aTitle === keyword) return -1;
-      if (bTitle === keyword) return 1;
+      // Exact match scoring (highest priority)
+      if (title === keyword) score += 3;
+      else if (title.startsWith(keyword)) score += 2;
+      else if (title.includes(keyword)) score += 1;
       
-      // Prioritize title starts with
-      if (aTitle.startsWith(keyword)) return -1;
-      if (bTitle.startsWith(keyword)) return 1;
+      // SKU matching
+      if (sku === keyword) score += 3;
+      else if (sku.startsWith(keyword)) score += 2;
+      else if (sku.includes(keyword)) score += 1;
       
-      // Prioritize SKU starts with
-      if (aSku.startsWith(keyword)) return -1;
-      if (bSku.startsWith(keyword)) return 1;
+      // Description matching (lower priority)
+      if (description.includes(keyword)) score += 0.5;
       
-      return 0;
-    });
-
-    if (sortedResults.length > 0) toast.success(`Found ${sortedResults.length} results`);
+      // Category matching (lowest priority)
+      if (category.includes(keyword)) score += 0.2;
+      if (subcategory.includes(keyword)) score += 0.2;
+      
+      return { ...product, _searchScore: score };
+    }).sort((a, b) => b._searchScore - a._searchScore);
+    
+    // Filter to only include matching products
+    const filtered = scoredProducts.filter(p => p._searchScore > 0);
+    
+    if (filtered.length > 0) toast.success(`Found ${filtered.length} results`);
     else toast.info("No matches found");
 
     const updated = [query, ...recentSearches.filter((i) => i !== query)].slice(
@@ -184,29 +181,56 @@ export default function Navbar() {
   const handleSearchChange = (value) => {
     setSearchQuery(value);
     if (value.trim()) {
-      // Update suggestions immediately
-      const keyword = value.toLowerCase().replace(/\s+/g, "");
-      const matched = products
-        .filter((p) => {
-          const normalize = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
-          return (
-            normalize(p.title).includes(keyword) ||
-            normalize(p.category?.name).includes(keyword) ||
-            normalize(p.subcategory?.name).includes(keyword) ||
-            (p.sku && normalize(p.sku).includes(keyword))
-          );
-        })
-        .slice(0, 5)
-        .map((p) => p.title);
+      // Update suggestions immediately using scoring logic
+      const keyword = value.toLowerCase().trim();
       
-      // Sort suggestions to prioritize exact matches
-      const sortedSuggestions = [...new Set([...matched, ...recentSearches])]
+      const scoredProducts = products.map(product => {
+        const title = (product.title || "").toLowerCase();
+        const sku = (product.sku || "").toLowerCase();
+        const category = (product.category?.name || "").toLowerCase();
+        const subcategory = (product.subcategory?.name || "").toLowerCase();
+        
+        let score = 0;
+        
+        // Exact match scoring (highest priority)
+        if (title === keyword) score += 3;
+        else if (title.startsWith(keyword)) score += 2;
+        else if (title.includes(keyword)) score += 1;
+        
+        // SKU matching
+        if (sku === keyword) score += 3;
+        else if (sku.startsWith(keyword)) score += 2;
+        else if (sku.includes(keyword)) score += 1;
+        
+        // Category matching (lowest priority)
+        if (category.includes(keyword)) score += 0.2;
+        if (subcategory.includes(keyword)) score += 0.2;
+        
+        return { ...product, _searchScore: score, _title: product.title };
+      }).filter(p => p._searchScore > 0)
+        .sort((a, b) => b._searchScore - a._searchScore);
+      
+      // Get unique titles from scored products
+      const matchedTitles = [...new Set(scoredProducts.map(p => p._title))].slice(0, 5);
+      
+      // Combine with recent searches and sort by relevance
+      const combinedSuggestions = [...new Set([...matchedTitles, ...recentSearches])]
         .slice(0, 5)
         .sort((a, b) => {
+          // Find scores for each suggestion
+          const aProduct = scoredProducts.find(p => p._title === a);
+          const bProduct = scoredProducts.find(p => p._title === b);
+          
+          const aScore = aProduct ? aProduct._searchScore : 0;
+          const bScore = bProduct ? bProduct._searchScore : 0;
+          
+          // Prioritize higher scores
+          if (aScore !== bScore) return bScore - aScore;
+          
+          // If scores are equal, prioritize exact matches
           const aLower = a.toLowerCase();
           const bLower = b.toLowerCase();
           
-          // Prioritize exact matches
           if (aLower === keyword) return -1;
           if (bLower === keyword) return 1;
           
@@ -217,7 +241,7 @@ export default function Navbar() {
           return 0;
         });
         
-      setSuggestions(sortedSuggestions);
+      setSuggestions(combinedSuggestions);
     } else {
       setSuggestions([]);
     }

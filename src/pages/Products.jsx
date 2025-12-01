@@ -84,7 +84,51 @@ const Products = () => {
   };
 
   const totalPages = Math.ceil(total / limit) || 1;
-  const productList = Array.isArray(products) ? products : [];
+  
+  // Apply scoring logic to sort products by relevance when searching
+  const getScoredProducts = (products, searchQuery) => {
+    if (!searchQuery || searchQuery.trim() === "") {
+      return products;
+    }
+    
+    const keyword = searchQuery.toLowerCase().trim();
+    
+    return [...products].map(product => {
+      const title = (product.title || "").toLowerCase();
+      const sku = (product.sku || "").toLowerCase();
+      const description = (product.description || "").toLowerCase();
+      const category = (product.category?.name || "").toLowerCase();
+      const subcategory = (product.subcategory?.name || "").toLowerCase();
+      
+      let score = 0;
+      
+      // Exact match scoring (highest priority)
+      if (title === keyword) score += 3;
+      else if (title.startsWith(keyword)) score += 2;
+      else if (title.includes(keyword)) score += 1;
+      
+      // SKU matching
+      if (sku === keyword) score += 3;
+      else if (sku.startsWith(keyword)) score += 2;
+      else if (sku.includes(keyword)) score += 1;
+      
+      // Description matching (lower priority)
+      if (description.includes(keyword)) score += 0.5;
+      
+      // Category matching (lowest priority)
+      if (category.includes(keyword)) score += 0.2;
+      if (subcategory.includes(keyword)) score += 0.2;
+      
+      return { ...product, _searchScore: score };
+    }).sort((a, b) => b._searchScore - a._searchScore);
+  };
+  
+  // Filter products based on search query using scoring
+  const scoredProducts = getScoredProducts(productList, filters.search);
+  // If there's only one high-scoring result, show only that one
+  const filteredProducts = scoredProducts.length === 1 && scoredProducts[0]._searchScore > 0 
+    ? [scoredProducts[0]] 
+    : scoredProducts.filter(p => p._searchScore > 0 || !filters.search);
 
   return (
     <div className="flex flex-col h-screen">
@@ -211,13 +255,13 @@ const Products = () => {
             </p>
           ) : error ? (
             <p className="text-red-500 text-sm sm:text-base">{error}</p>
-          ) : productList.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <p className="text-gray-500 text-sm sm:text-base">
               No products found.
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-              {productList.map((product) => (
+              {filteredProducts.map((product) => (
                 <Card
                   key={product._id}
                   onClick={() => navigate(`/product/${product.slug}`)}
