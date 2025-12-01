@@ -4,13 +4,16 @@ import axios from "axios";
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
+// Detect Chrome on iOS (which is actually Safari)
+const isChromeOnIOS = typeof navigator !== 'undefined' && /CriOS/i.test(navigator.userAgent);
 
 // Log environment info for debugging
-if (isIOS || isSafari || isMobile) {
+if (isIOS || isSafari || isMobile || isChromeOnIOS) {
   console.log("Axios config: Detected mobile/iOS/Safari environment", {
     isIOS,
     isSafari,
     isMobile,
+    isChromeOnIOS,
     userAgent: navigator.userAgent
   });
 }
@@ -33,7 +36,7 @@ export const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   (config) => {
     // Log requests for iOS/Safari debugging
-    if (isIOS || isSafari || isMobile) {
+    if (isIOS || isSafari || isMobile || isChromeOnIOS) {
       console.log("Axios request:", {
         url: config.url,
         method: config.method,
@@ -43,7 +46,7 @@ axiosInstance.interceptors.request.use(
     }
     
     // For Safari, ensure we're not using cached requests (only for GET requests)
-    if (isSafari && config.method?.toUpperCase() === 'GET') {
+    if ((isSafari || isIOS || isChromeOnIOS) && config.method?.toUpperCase() === 'GET') {
       config.headers['Cache-Control'] = 'no-cache';
       config.headers['Pragma'] = 'no-cache';
     }
@@ -78,7 +81,7 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
     
     // Log errors for iOS/Safari debugging
-    if (isIOS || isSafari || isMobile) {
+    if (isIOS || isSafari || isMobile || isChromeOnIOS) {
       console.log("Axios interceptor: Request failed", {
         url: originalRequest?.url,
         status: error.response?.status,
@@ -107,7 +110,7 @@ axiosInstance.interceptors.response.use(
 
       try {
         // Call refresh endpoint — COOKIE will be used automatically
-        if (isIOS || isSafari || isMobile) {
+        if (isIOS || isSafari || isMobile || isChromeOnIOS) {
           console.log("Axios interceptor: Attempting to refresh token");
         }
         
@@ -178,7 +181,7 @@ const safariRetryWrapper = (originalMethod) => {
       return await originalMethod.call(this, url, data, config);
     } catch (error) {
       // If it's a network error on Safari, try once more
-      if ((isIOS || isSafari) && 
+      if ((isIOS || isSafari || isChromeOnIOS) && 
           (error.code === 'NETWORK_ERROR' || 
            error.message.includes('Network Error') ||
            error.message.includes('Failed to fetch'))) {
@@ -202,7 +205,7 @@ const safariRetryWrapper = (originalMethod) => {
 };
 
 // Apply retry wrapper to all methods for Safari
-if (isIOS || isSafari) {
+if (isIOS || isSafari || isChromeOnIOS) {
   axiosInstance.post = safariRetryWrapper(originalPost);
   axiosInstance.get = safariRetryWrapper(originalGet);
   axiosInstance.put = safariRetryWrapper(originalPut);
