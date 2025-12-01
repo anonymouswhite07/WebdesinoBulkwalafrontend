@@ -74,6 +74,27 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
+  // ✅ Handle mobile back button properly
+  useEffect(() => {
+    // Detect if we're on mobile Safari
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (isIOS || isSafari) {
+      // Add popstate listener for proper back navigation on iOS Safari
+      const handlePopState = () => {
+        // Force a re-render when back button is pressed
+        setMobileMenuOpen(false);
+      };
+      
+      window.addEventListener('popstate', handlePopState);
+      
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, []);
+
   // ✅ Voice Search
   const handleVoiceSearch = () => {
     if (!("webkitSpeechRecognition" in window)) {

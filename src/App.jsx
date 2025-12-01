@@ -1,5 +1,5 @@
 import "./index.css";
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import Mainlayout from "./components/layout/Mainlayout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -29,16 +29,48 @@ import Wishlist from "./pages/Wishlist";
 import OrderTrack from "./pages/OrderTrack";
 import SellerSignup from "./Seller/pages/SellerSignup";
 
+// Import the scroll to top component
+import ScrollToTop from "./components/ScrollToTop";
+
+// Mobile back button handling
+import { useEffect } from "react";
+
 const ROLES = {
   ADMIN: "admin",
   SELLER: "seller",
   CUSTOMER: "customer",
 };
 
+// Add mobile back button handling
+const handleMobileBackButton = () => {
+  // Detect if we're on mobile Safari
+  const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+  if (isIOS || isSafari) {
+    // Add popstate listener for proper back navigation on iOS Safari
+    const handlePopState = () => {
+      // This will help ensure proper navigation behavior
+      window.scrollTo(0, 0);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }
+};
+
 const App = createBrowserRouter([
   {
     path: "/",
-    element: <Mainlayout />,
+    element: (
+      <>
+        <ScrollToTop />
+        <Mainlayout />
+      </>
+    ),
     children: [
       {
         index: true,
@@ -199,5 +231,8 @@ const App = createBrowserRouter([
     ],
   },
 ]);
+
+// Add mobile back button handling effect
+handleMobileBackButton();
 
 export default App;
