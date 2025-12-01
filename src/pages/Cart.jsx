@@ -40,42 +40,83 @@ const Cart = () => {
   const [isFetched, setIsFetched] = useState(false);
   const [couponCode, setCouponCode] = useState(""); // State to store coupon code
   const [referralCode, setReferralCode] = useState("");
+  const [loadError, setLoadError] = useState(null); // New state for load errors
 
   // ✅ Fetch cart data on mount
   useEffect(() => {
     const loadCart = async () => {
-      await fetchCart();
-      setIsFetched(true);
+      // Detect iOS/Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      
+      if (isIOS || isSafari) {
+        console.log("Cart page: Detected iOS/Safari environment");
+      }
+      
+      try {
+        // Reset error state
+        setLoadError(null);
+        
+        if (isIOS || isSafari) {
+          console.log("Cart page: Starting cart loading process");
+        }
+        
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Cart loading timeout')), 15000)
+        );
+        
+        const fetchPromise = fetchCart();
+        await Promise.race([fetchPromise, timeoutPromise]);
+        
+        if (isIOS || isSafari) {
+          console.log("Cart page: Cart loading completed successfully");
+        }
+      } catch (error) {
+        console.error("Cart loading error:", error);
+        if (isIOS || isSafari) {
+          console.log("Cart page: Cart loading failed", error.message);
+        }
+        setLoadError(error.message || "Failed to load cart");
+        // Set fetched to true even on error to prevent infinite loading
+      } finally {
+        setIsFetched(true);
+      }
     };
-    loadCart();
+    
+    // Only load cart if we're in browser environment
+    if (typeof window !== "undefined") {
+      loadCart();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // fetchCart is stable from zustand store
 
-  // ⭐ Auto-scroll for BUY NOW product
-  useEffect(() => {
-    if (buyNowProductId) {
-      setTimeout(() => {
-        const el = document.getElementById(`cart-item-${buyNowProductId}`);
-        if (el) {
-          el.scrollIntoView({ behavior: "smooth", block: "center" });
-          el.classList.add("ring-2", "ring-blue-500", "rounded-lg");
-          setTimeout(
-            () => el.classList.remove("ring-2", "ring-blue-500"),
-            2000
-          );
-        }
-      }, 300);
-    }
-  }, [buyNowProductId]);
-
-  useEffect(() => {
-    fetchActiveOffer();
-  }, []);
-  // ✅ Loading state
+  // ✅ Loading state with timeout protection
   if (isLoading || !isFetched) {
     return (
-      <div className="min-h-screen flex justify-center items-center text-gray-600 text-base sm:text-lg">
-        Loading cart...
+      <div className="min-h-screen flex flex-col justify-center items-center text-gray-600 text-base sm:text-lg">
+        <p>Loading cart...</p>
+        <div className="mt-4 w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  // ✅ Error state
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex flex-col justify-center items-center gap-4 text-gray-600 text-base sm:text-lg">
+        <p className="text-red-500">Error: {loadError}</p>
+        <p>There was a problem loading your cart. Please try again.</p>
+        <Button 
+          onClick={() => {
+            setIsFetched(false);
+            setLoadError(null);
+            fetchCart();
+          }} 
+          className="bg-[#02066F]"
+        >
+          Retry
+        </Button>
       </div>
     );
   }
@@ -96,7 +137,8 @@ const Cart = () => {
   const handleUpdateQuantity = async (productId, quantity) => {
     try {
       await updateCart(productId, quantity);
-    } catch {
+    } catch (error) {
+      console.error("Failed to update quantity:", error);
       toast.error("Failed to update quantity");
     }
   };
@@ -106,7 +148,8 @@ const Cart = () => {
       await removeCartItem(productId);
       await fetchCart();
       toast.success("Item removed from cart");
-    } catch {
+    } catch (error) {
+      console.error("Failed to remove item:", error);
       toast.error("Failed to remove item");
     }
   };
@@ -115,7 +158,8 @@ const Cart = () => {
     try {
       await clearCart();
       toast.success("Cart cleared");
-    } catch {
+    } catch (error) {
+      console.error("Failed to clear cart:", error);
       toast.error("Failed to clear cart");
     }
   };
@@ -134,7 +178,7 @@ const Cart = () => {
 
       if (flashDiscount > 0) {
         toast.error(
-          "Flash Offer is active — you can’t apply a coupon right now."
+          "Flash Offer is active — you can't apply a coupon right now."
         );
         return;
       }
@@ -148,7 +192,8 @@ const Cart = () => {
 
       toast.success(result.message || "Coupon applied successfully!");
       setCouponCode("");
-    } catch {
+    } catch (error) {
+      console.error("Error applying coupon:", error);
       toast.error("Something went wrong while applying coupon");
     }
   };
@@ -160,6 +205,7 @@ const Cart = () => {
       await fetchCart();
       toast.success("Coupon removed");
     } catch (error) {
+      console.error("Failed to remove coupon:", error);
       toast.error("Failed to remove coupon");
     }
   };
@@ -185,14 +231,20 @@ const Cart = () => {
       toast.success(result.message || "Referral applied successfully!");
       setReferralCode("");
     } catch (error) {
+      console.error("Error applying referral:", error);
       toast.error("Something went wrong while applying referral");
     }
   };
 
   const handleRemoveReferral = async () => {
-    const res = await removeReferral();
-    if (res.success) toast.success("Referral removed");
-    else toast.error(res.message || "Failed to remove referral");
+    try {
+      const res = await removeReferral();
+      if (res.success) toast.success("Referral removed");
+      else toast.error(res.message || "Failed to remove referral");
+    } catch (error) {
+      console.error("Error removing referral:", error);
+      toast.error("Failed to remove referral");
+    }
   };
 
   // NOTE: totalPrice coming from store already contains discount (store/calculation),
@@ -249,7 +301,11 @@ const Cart = () => {
                 {/* Show loading state if product details not loaded yet (guest cart) */}
                 {!product ? (
                   <div className="w-full flex items-center justify-center py-8">
-                    <p className="text-gray-500">Loading product details...</p>
+                    <div className="flex flex-col items-center">
+                      <p className="text-gray-500">Loading product details...</p>
+                      <div className="mt-2 w-6 h-6 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-xs text-gray-400 mt-2">If this takes too long, try refreshing the page</p>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -262,6 +318,9 @@ const Cart = () => {
                         }
                         alt={product.title || "Product"}
                         className="w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 object-cover rounded-md mx-auto sm:mx-0"
+                        onError={(e) => {
+                          e.target.src = "https://ik.imagekit.io/bulkwala/demo/default-product.png";
+                        }}
                       />
                       <div className="flex flex-col gap-2 w-full">
                         <h3 className="text-lg sm:text-xl font-medium text-gray-800">

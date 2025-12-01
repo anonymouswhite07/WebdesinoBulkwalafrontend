@@ -16,33 +16,103 @@ import useAuthStore from "./auth.store";
 // ✅ Guest cart localStorage key
 const GUEST_CART_KEY = "guest_cart";
 
-// ✅ Helper functions for guest cart
+// ✅ Helper functions for guest cart with Safari private mode handling
 const getGuestCart = () => {
+  // Check if we're in a browser environment
+  if (typeof window === "undefined") {
+    console.log("getGuestCart: Not in browser environment");
+    return { items: [] };
+  }
+  
+  // Detect iOS/Safari
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+  if (isIOS || isSafari) {
+    console.log("getGuestCart: Detected iOS/Safari environment");
+  }
+  
   try {
     const cart = localStorage.getItem(GUEST_CART_KEY);
-    return cart ? JSON.parse(cart) : { items: [] };
-  } catch {
+    // Ensure we return a valid cart object
+    const parsedCart = cart ? JSON.parse(cart) : { items: [] };
+    const validCart = parsedCart && Array.isArray(parsedCart.items) ? parsedCart : { items: [] };
+    
+    if (isIOS || isSafari) {
+      console.log("getGuestCart: Successfully retrieved cart from localStorage", validCart);
+    }
+    
+    return validCart;
+  } catch (error) {
+    console.warn("Error reading guest cart from localStorage:", error);
+    // Return empty cart on error
+    if (isIOS || isSafari) {
+      console.log("getGuestCart: Returning empty cart due to error");
+    }
     return { items: [] };
   }
 };
 
 const saveGuestCart = (cart) => {
+  // Check if we're in a browser environment
+  if (typeof window === "undefined") {
+    console.log("saveGuestCart: Not in browser environment");
+    return;
+  }
+  
+  // Detect iOS/Safari
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+  if (isIOS || isSafari) {
+    console.log("saveGuestCart: Detected iOS/Safari environment, attempting to save cart", cart);
+  }
+  
   try {
-    localStorage.setItem(GUEST_CART_KEY, JSON.stringify(cart));
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("Error saving guest cart:", error);
+    // Validate cart object before saving
+    if (cart && Array.isArray(cart.items)) {
+      localStorage.setItem(GUEST_CART_KEY, JSON.stringify(cart));
+      if (isIOS || isSafari) {
+        console.log("saveGuestCart: Successfully saved cart to localStorage");
+      }
+    } else {
+      console.warn("saveGuestCart: Invalid cart object provided", cart);
     }
+  } catch (error) {
+    console.warn("Error saving guest cart to localStorage:", error);
+    if (isIOS || isSafari) {
+      console.log("saveGuestCart: Failed to save cart, likely Safari private mode");
+    }
+    // Silent fail in Safari private mode
   }
 };
 
 const clearGuestCart = () => {
+  // Check if we're in a browser environment
+  if (typeof window === "undefined") {
+    console.log("clearGuestCart: Not in browser environment");
+    return;
+  }
+  
+  // Detect iOS/Safari
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  
+  if (isIOS || isSafari) {
+    console.log("clearGuestCart: Detected iOS/Safari environment");
+  }
+  
   try {
     localStorage.removeItem(GUEST_CART_KEY);
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("Error clearing guest cart:", error);
+    if (isIOS || isSafari) {
+      console.log("clearGuestCart: Successfully cleared cart from localStorage");
     }
+  } catch (error) {
+    console.warn("Error clearing guest cart from localStorage:", error);
+    if (isIOS || isSafari) {
+      console.log("clearGuestCart: Failed to clear cart, likely Safari private mode");
+    }
+    // Silent fail in Safari private mode
   }
 };
 
@@ -66,6 +136,11 @@ const useCartStore = create((set, get) => ({
 
   // ✅ Load guest cart on initialization
   loadGuestCart: () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return;
+    }
+    
     const { user } = useAuthStore.getState();
     if (!user || !user._id) {
       const guestCart = getGuestCart();
@@ -77,51 +152,82 @@ const useCartStore = create((set, get) => ({
 
   // ✅ Fetch cart (backend for logged in, localStorage for guests)
   fetchCart: async () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      set({ isLoading: false });
+      return;
+    }
+    
     const { user } = useAuthStore.getState();
 
     set({ isLoading: true });
 
     // ✅ If not logged in, load from localStorage and normalize guest cart
     if (!user || !user._id) {
+      console.log("fetchCart: User not logged in, loading guest cart");
       const guestCart = getGuestCart();
-
+      
       // ✅ If guest cart has items, fetch product details for each
       if (guestCart.items && guestCart.items.length > 0) {
+        console.log("fetchCart: Guest cart has items, fetching product details", guestCart.items.length);
         set({ isLoading: true });
         try {
+          // Add timeout to prevent hanging requests
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Product fetch timeout')), 10000)
+          );
+          
           // Fetch all products to get details
-          const allProducts = await getProducts({ limit: 1000 });
+          console.log("fetchCart: Fetching all products for guest cart");
+          const productPromise = getProducts({ limit: 1000 });
+          const allProducts = await Promise.race([productPromise, timeoutPromise]);
+          
+          // Ensure we have a valid products array
           const productsArray = Array.isArray(allProducts.products)
             ? allProducts.products
             : Array.isArray(allProducts)
             ? allProducts
             : [];
-
+            
+          console.log("fetchCart: Retrieved products array", productsArray.length);
+            
           // ✅ Normalize guest cart items to match backend structure
           // ✅ Filter out deleted/inactive products and handle missing products gracefully
           const normalizedItems = [];
           const removedProductIds = [];
 
           for (const item of guestCart.items) {
+            // Ensure item has required properties
+            if (!item.productId) {
+              console.warn("fetchCart: Skipping item with missing productId", item);
+              continue;
+            }
+            
             const product = productsArray.find((p) => p._id === item.productId);
+            
+            console.log("fetchCart: Processing item", item.productId, !!product);
 
             // Skip if product not found, deleted, or inactive
             if (!product) {
+              console.log("fetchCart: Product not found, marking for removal", item.productId);
               removedProductIds.push(item.productId);
               continue;
             }
 
             if (product.isDeleted || !product.isActive) {
+              console.log("fetchCart: Product deleted or inactive, marking for removal", item.productId);
               removedProductIds.push(item.productId);
               continue;
             }
 
             // ✅ Adjust quantity if it exceeds available stock
-            let quantity = item.quantity;
+            let quantity = item.quantity || 1;
             if (product.stock !== undefined && quantity > product.stock) {
               if (product.stock > 0) {
                 quantity = product.stock; // Reduce to available stock
+                console.log("fetchCart: Adjusted quantity due to stock limit", item.productId, quantity);
               } else {
+                console.log("fetchCart: Product out of stock, marking for removal", item.productId);
                 removedProductIds.push(item.productId); // Remove out of stock items
                 continue;
               }
@@ -145,6 +251,7 @@ const useCartStore = create((set, get) => ({
 
           // ✅ Update guest cart if products were removed
           if (removedProductIds.length > 0) {
+            console.log("fetchCart: Removing invalid products from guest cart", removedProductIds);
             const updatedGuestCart = {
               items: normalizedItems.map((item) => ({
                 productId: item.product._id,
@@ -170,6 +277,14 @@ const useCartStore = create((set, get) => ({
             0
           );
 
+          console.log("fetchCart: Setting normalized cart", {
+            itemsCount: normalizedItems.length,
+            itemsPrice,
+            shippingPrice,
+            totalPrice,
+            totalItems
+          });
+
           set({
             cart: normalizedCart,
             itemsPrice,
@@ -181,12 +296,10 @@ const useCartStore = create((set, get) => ({
           });
           return;
         } catch (error) {
-          if (process.env.NODE_ENV === "development") {
-            console.error(
-              "Error fetching product details for guest cart:",
-              error
-            );
-          }
+          console.warn(
+            "Error fetching product details for guest cart:",
+            error
+          );
           // Fallback to basic guest cart structure
           set({
             cart: guestCart,
@@ -197,6 +310,7 @@ const useCartStore = create((set, get) => ({
         }
       }
 
+      console.log("fetchCart: Guest cart is empty or invalid", guestCart);
       set({
         cart: guestCart,
         isLoading: false,
@@ -209,7 +323,13 @@ const useCartStore = create((set, get) => ({
     // ✅ If logged in, fetch from backend
     set({ isLoading: true });
     try {
-      const cartData = await fetchCartService();
+      // Add timeout to prevent hanging requests
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Cart fetch timeout')), 10000)
+      );
+      
+      const cartPromise = fetchCartService();
+      const cartData = await Promise.race([cartPromise, timeoutPromise]);
 
       const hasReferral = !!cartData.referralCode;
       const hasCoupon = !!cartData.coupon;
@@ -266,10 +386,13 @@ const useCartStore = create((set, get) => ({
         set({ cart: guestCart, isLoading: false });
         return;
       }
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error fetching cart:", error);
-      }
-      set({ isLoading: false });
+      
+      console.warn("Error fetching cart:", error);
+      // Set loading to false even on error to prevent infinite loading
+      set({ 
+        isLoading: false,
+        cartInitialized: true 
+      });
     }
   },
 
@@ -292,6 +415,11 @@ const useCartStore = create((set, get) => ({
 
   // ✅ Add to cart (works for both guest and authenticated)
   addToCart: async (productId, quantity = 1) => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot add to cart in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     set({ isUpdating: true });
@@ -299,7 +427,13 @@ const useCartStore = create((set, get) => ({
     try {
       // ✅ If logged in, use backend
       if (user && user._id) {
-        const cartData = await addToCartService(productId, quantity);
+        // Add timeout to prevent hanging requests
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Add to cart timeout')), 10000)
+        );
+        
+        const cartPromise = addToCartService(productId, quantity);
+        const cartData = await Promise.race([cartPromise, timeoutPromise]);
 
         if (cartData.discount && cartData.totalPrice < cartData.minOrderValue) {
           set({
@@ -352,9 +486,7 @@ const useCartStore = create((set, get) => ({
         return { success: true, message: "Item added to cart (guest mode)" };
       }
 
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error adding to cart:", error);
-      }
+      console.warn("Error adding to cart:", error);
 
       return {
         success: false,
@@ -365,6 +497,11 @@ const useCartStore = create((set, get) => ({
 
   // ✅ Merge guest cart with backend cart on login
   mergeGuestCart: async () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return;
+    }
+    
     const guestCart = getGuestCart();
     if (!guestCart.items || guestCart.items.length === 0) {
       // No guest cart to merge, just fetch backend cart
@@ -373,18 +510,22 @@ const useCartStore = create((set, get) => ({
     }
 
     try {
-      // Add each guest cart item to backend cart
+      // Add each guest cart item to backend cart with timeout protection
       for (const item of guestCart.items) {
         try {
-          await addToCartService(item.productId, item.quantity);
+          // Add timeout to prevent hanging requests
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Add to cart timeout')), 5000)
+          );
+          
+          const cartPromise = addToCartService(item.productId, item.quantity);
+          await Promise.race([cartPromise, timeoutPromise]);
         } catch (error) {
           // If item already exists or other error, continue with next item
-          if (process.env.NODE_ENV === "development") {
-            console.warn(
-              `Failed to add item ${item.productId} to cart:`,
-              error.message
-            );
-          }
+          console.warn(
+            `Failed to add item ${item.productId} to cart:`,
+            error.message
+          );
         }
       }
 
@@ -394,15 +535,18 @@ const useCartStore = create((set, get) => ({
       // Refresh cart from backend (this will handle 404 gracefully now)
       await get().fetchCart();
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error merging guest cart:", error);
-      }
+      console.warn("Error merging guest cart:", error);
       // Even if merge fails, try to fetch cart (might be empty, which is OK)
       await get().fetchCart();
     }
   },
 
   updateCart: async (productId, quantity) => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot update cart in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     // Enforce limits
@@ -413,8 +557,13 @@ const useCartStore = create((set, get) => ({
 
     try {
       if (user && user._id) {
-        // Backend update
-        await updateCartItemService(productId, quantity);
+        // Backend update with timeout protection
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Update cart timeout')), 10000)
+        );
+        
+        const updatePromise = updateCartItemService(productId, quantity);
+        await Promise.race([updatePromise, timeoutPromise]);
 
         set((state) => {
           // Update items
@@ -468,7 +617,7 @@ const useCartStore = create((set, get) => ({
 
       return { success: false, message: "Item not found in cart" };
     } catch (error) {
-      console.error("Error updating cart:", error);
+      console.warn("Error updating cart:", error);
       return {
         success: false,
         message: error.response?.data?.message || "Failed to update cart",
@@ -479,13 +628,25 @@ const useCartStore = create((set, get) => ({
   },
 
   removeCartItem: async (productId) => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot remove item in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     set({ isUpdating: true });
 
     try {
       if (user && user._id) {
-        await removeCartItemService(productId);
+        // Backend remove with timeout protection
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Remove item timeout')), 10000)
+        );
+        
+        const removePromise = removeCartItemService(productId);
+        await Promise.race([removePromise, timeoutPromise]);
+        
         set((state) => {
           const updatedItems = state.cart.items.filter(
             (item) => item.product._id !== productId
@@ -512,9 +673,7 @@ const useCartStore = create((set, get) => ({
         return { success: true };
       }
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error removing item:", error);
-      }
+      console.warn("Error removing item:", error);
       return {
         success: false,
         message: error.response?.data?.message || "Failed to remove item",
@@ -525,13 +684,24 @@ const useCartStore = create((set, get) => ({
   },
 
   clearCart: async () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot clear cart in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     set({ isUpdating: true });
 
     try {
       if (user && user._id) {
-        await clearCartService();
+        // Backend clear with timeout protection
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Clear cart timeout')), 10000)
+        );
+        
+        const clearPromise = clearCartService();
+        await Promise.race([clearPromise, timeoutPromise]);
       }
 
       // Clear both backend and guest cart
@@ -548,9 +718,7 @@ const useCartStore = create((set, get) => ({
       });
       return { success: true };
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error clearing cart:", error);
-      }
+      console.warn("Error clearing cart:", error);
       return {
         success: false,
         message: error.response?.data?.message || "Failed to clear cart",
@@ -576,6 +744,11 @@ const useCartStore = create((set, get) => ({
 
   // ✅ Apply coupon (only for logged in users)
   applyCoupon: async (code) => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot apply coupon in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
     const { referralApplied, couponApplied } = get();
 
@@ -595,7 +768,14 @@ const useCartStore = create((set, get) => ({
 
     try {
       set({ isUpdating: true, couponError: null });
-      const res = await applyCouponService(code);
+      
+      // Apply coupon with timeout protection
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Apply coupon timeout')), 10000)
+      );
+      
+      const couponPromise = applyCouponService(code);
+      const res = await Promise.race([couponPromise, timeoutPromise]);
 
       if (res.success) {
         await get().fetchCart();
@@ -621,6 +801,11 @@ const useCartStore = create((set, get) => ({
   },
 
   removeCoupon: async () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot remove coupon in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     if (!user || !user._id) {
@@ -629,7 +814,14 @@ const useCartStore = create((set, get) => ({
 
     set({ isUpdating: true, couponError: "" });
     try {
-      const response = await removeCouponService();
+      // Remove coupon with timeout protection
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Remove coupon timeout')), 10000)
+      );
+      
+      const removePromise = removeCouponService();
+      const response = await Promise.race([removePromise, timeoutPromise]);
+      
       set((state) => ({
         discount: 0,
         couponApplied: false,
@@ -642,9 +834,7 @@ const useCartStore = create((set, get) => ({
       get().calculateTotals();
       return { success: true };
     } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        console.error("Error removing coupon:", error);
-      }
+      console.warn("Error removing coupon:", error);
       set({ couponError: error.response?.data?.message || error.message });
       return {
         success: false,
@@ -656,6 +846,11 @@ const useCartStore = create((set, get) => ({
   },
 
   applyReferral: async (referralCode) => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot apply referral in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
     const { couponApplied, referralApplied } = get();
 
@@ -676,7 +871,14 @@ const useCartStore = create((set, get) => ({
 
     set({ isUpdating: true });
     try {
-      const res = await applyReferralService({ referralCode });
+      // Apply referral with timeout protection
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Apply referral timeout')), 10000)
+      );
+      
+      const referralPromise = applyReferralService({ referralCode });
+      const res = await Promise.race([referralPromise, timeoutPromise]);
+      
       await get().fetchCart();
       return { success: true, data: res };
     } catch (err) {
@@ -689,6 +891,11 @@ const useCartStore = create((set, get) => ({
   },
 
   removeReferral: async () => {
+    // Only run in browser environment
+    if (typeof window === "undefined") {
+      return { success: false, message: "Cannot remove referral in server environment" };
+    }
+    
     const { user } = useAuthStore.getState();
 
     if (!user || !user._id) {
@@ -697,7 +904,14 @@ const useCartStore = create((set, get) => ({
 
     set({ isUpdating: true });
     try {
-      await removeReferralService();
+      // Remove referral with timeout protection
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Remove referral timeout')), 10000)
+      );
+      
+      const removePromise = removeReferralService();
+      await Promise.race([removePromise, timeoutPromise]);
+      
       await get().fetchCart();
       return { success: true };
     } catch (err) {
@@ -713,3 +927,7 @@ const useCartStore = create((set, get) => ({
 }));
 
 export default useCartStore;
+
+
+
+
