@@ -24,6 +24,7 @@ if (typeof window !== 'undefined' && window.location.protocol === 'https:' && ba
   baseURL = baseURL.replace('http:', 'https:');
 }
 
+// Enhanced axios configuration for Safari compatibility
 export const axiosInstance = axios.create({
   baseURL,
   withCredentials: true, // IMPORTANT: allows sending cookies
@@ -32,8 +33,36 @@ export const axiosInstance = axios.create({
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
     'Expires': '0',
-  }
+  },
+  // Add timeout to prevent hanging requests
+  timeout: 30000, // 30 seconds
 });
+
+// Add request interceptor for Safari debugging
+axiosInstance.interceptors.request.use(
+  (config) => {
+    // Log requests for iOS/Safari debugging
+    if (isIOS || isSafari || isMobile) {
+      console.log("Axios request:", {
+        url: config.url,
+        method: config.method,
+        headers: config.headers,
+        withCredentials: config.withCredentials
+      });
+    }
+    
+    // For Safari, ensure we're not using cached requests
+    if (isSafari) {
+      config.headers['Cache-Control'] = 'no-cache';
+      config.headers['Pragma'] = 'no-cache';
+    }
+    
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Track if we're already refreshing to prevent infinite loops
 let isRefreshing = false;
@@ -94,7 +123,7 @@ axiosInstance.interceptors.response.use(
         const { data } = await axiosInstance.post("/users/refresh-token", {}, { 
           withCredentials: true,
           // Add timeout to prevent hanging requests
-          timeout: 10000
+          timeout: 15000
         });
         
         const newAccessToken = data?.data?.accessToken;

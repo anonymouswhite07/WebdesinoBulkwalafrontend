@@ -128,11 +128,38 @@ export default function Navbar() {
         normalize(p.title).includes(keyword) ||
         normalize(p.description).includes(keyword) ||
         normalize(p.category?.name).includes(keyword) ||
-        normalize(p.subcategory?.name).includes(keyword)
+        normalize(p.subcategory?.name).includes(keyword) ||
+        (p.sku && normalize(p.sku).includes(keyword)) // Add SKU search
       );
     });
 
-    if (filtered.length > 0) toast.success(`Found ${filtered.length} results`);
+    // Sort results to prioritize exact matches and SKU matches
+    const sortedResults = [...filtered].sort((a, b) => {
+      const aTitle = (a.title || "").toLowerCase();
+      const bTitle = (b.title || "").toLowerCase();
+      const aSku = (a.sku || "").toLowerCase();
+      const bSku = (b.sku || "").toLowerCase();
+      
+      // Prioritize SKU exact matches
+      if (aSku === keyword) return -1;
+      if (bSku === keyword) return 1;
+      
+      // Prioritize title exact matches
+      if (aTitle === keyword) return -1;
+      if (bTitle === keyword) return 1;
+      
+      // Prioritize title starts with
+      if (aTitle.startsWith(keyword)) return -1;
+      if (bTitle.startsWith(keyword)) return 1;
+      
+      // Prioritize SKU starts with
+      if (aSku.startsWith(keyword)) return -1;
+      if (bSku.startsWith(keyword)) return 1;
+      
+      return 0;
+    });
+
+    if (sortedResults.length > 0) toast.success(`Found ${sortedResults.length} results`);
     else toast.info("No matches found");
 
     const updated = [query, ...recentSearches.filter((i) => i !== query)].slice(
@@ -165,12 +192,32 @@ export default function Navbar() {
         return (
           normalize(p.title).includes(keyword) ||
           normalize(p.category?.name).includes(keyword) ||
-          normalize(p.subcategory?.name).includes(keyword)
+          normalize(p.subcategory?.name).includes(keyword) ||
+          (p.sku && normalize(p.sku).includes(keyword)) // Add SKU search
         );
       })
       .slice(0, 5)
       .map((p) => p.title);
-    setSuggestions([...new Set([...matched, ...recentSearches])].slice(0, 5));
+    
+    // Sort suggestions to prioritize exact matches
+    const sortedSuggestions = [...new Set([...matched, ...recentSearches])]
+      .slice(0, 5)
+      .sort((a, b) => {
+        const aLower = a.toLowerCase();
+        const bLower = b.toLowerCase();
+        
+        // Prioritize exact matches
+        if (aLower === keyword) return -1;
+        if (bLower === keyword) return 1;
+        
+        // Prioritize starts with
+        if (aLower.startsWith(keyword)) return -1;
+        if (bLower.startsWith(keyword)) return 1;
+        
+        return 0;
+      });
+      
+    setSuggestions(sortedSuggestions);
   }, [searchQuery, products]);
 
   // ✅ Logout
