@@ -85,7 +85,13 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (err) {
         // Refresh failed → logout and clear queue
+        console.error("Token refresh failed:", err.message);
         processQueue(err, null);
+        
+        // Instead of rejecting, we'll redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
         return Promise.reject(err);
       } finally {
         isRefreshing = false;

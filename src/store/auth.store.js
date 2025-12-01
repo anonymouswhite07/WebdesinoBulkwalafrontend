@@ -226,6 +226,7 @@ export const useAuthStore = create((set, get) => ({
         set({ user: null, isLoggedIn: false });
       }
     } catch (error) {
+      console.error("Auth check failed:", error.message);
       set({ user: null, isLoggedIn: false });
     } finally {
       set({ isLoading: false });
