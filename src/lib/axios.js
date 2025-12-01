@@ -27,6 +27,12 @@ if (typeof window !== 'undefined' && window.location.protocol === 'https:' && ba
 export const axiosInstance = axios.create({
   baseURL,
   withCredentials: true, // IMPORTANT: allows sending cookies
+  // Add additional config for mobile Safari
+  headers: {
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache',
+    'Expires': '0',
+  }
 });
 
 // Track if we're already refreshing to prevent infinite loops
@@ -85,7 +91,11 @@ axiosInstance.interceptors.response.use(
           console.log("Axios interceptor: Attempting to refresh token");
         }
         
-        const { data } = await axiosInstance.post("/users/refresh-token", {}, { withCredentials: true });
+        const { data } = await axiosInstance.post("/users/refresh-token", {}, { 
+          withCredentials: true,
+          // Add timeout to prevent hanging requests
+          timeout: 10000
+        });
         
         const newAccessToken = data?.data?.accessToken;
         if (!newAccessToken) {

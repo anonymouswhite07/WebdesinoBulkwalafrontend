@@ -338,9 +338,13 @@ export const useAuthStore = create((set, get) => ({
       // This helps with mobile Safari where network requests might fail
       const currentState = get();
       if (currentState.user !== null || currentState.isLoggedIn !== false) {
-        set({ user: null, isLoggedIn: false });
-        // Clear stored auth state
-        setStoredAuthState(null);
+        // Only clear state if we don't have stored state as fallback
+        const storedState = getStoredAuthState();
+        if (!storedState) {
+          set({ user: null, isLoggedIn: false });
+          // Clear stored auth state
+          setStoredAuthState(null);
+        }
       }
     } finally {
       set({ isLoading: false });
