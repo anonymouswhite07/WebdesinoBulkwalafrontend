@@ -11,6 +11,9 @@ export default function CategoryNav({ selectedCategory, onSelect }) {
   if (loading)
     return <p className="text-center text-gray-500 py-3">Loading...</p>;
 
+  // Ensure categories is always an array
+  const safeCategories = Array.isArray(categories) ? categories : [];
+
   return (
     <div
       className="
@@ -28,7 +31,7 @@ export default function CategoryNav({ selectedCategory, onSelect }) {
         sticky top-0 z-30
       "
     >
-      {categories.map((cat) => {
+      {safeCategories.map((cat) => {
         const isSelected = selectedCategory?._id === cat._id;
 
         return (

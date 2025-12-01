@@ -10,7 +10,9 @@ export const useCategoryStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const data = await getCategories();
-      set({ categories: data, loading: false });
+      // Ensure data is always an array
+      const categoriesArray = Array.isArray(data) ? data : [];
+      set({ categories: categoriesArray, loading: false });
     } catch (error) {
       set({ error: error.message, loading: false });
     }

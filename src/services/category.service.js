@@ -1,8 +1,15 @@
 import { axiosInstance } from "@/lib/axios";
 
 export const getCategories = async () => {
-  const res = await axiosInstance.get("/category");
-  return res.data.data;
+  try {
+    const res = await axiosInstance.get("/category");
+    // Ensure we return an array, even if the response structure is unexpected
+    return Array.isArray(res.data.data) ? res.data.data : [];
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    // Return empty array on error to prevent app crashes
+    return [];
+  }
 };
 
 export const createCategory = async (categoryData) => {
