@@ -170,6 +170,7 @@ export default function Navbar() {
     localStorage.setItem("recentSearches", JSON.stringify(updated));
 
     setSuggestions([]); // ✅ close dropdown
+    // Navigate to products page with search query
     navigate(`/products?search=${encodeURIComponent(query)}`);
   };
 
@@ -179,46 +180,48 @@ export default function Navbar() {
     setSuggestions([]);
   };
 
-  // ✅ Smart suggestions logic
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSuggestions([]);
-      return;
-    }
-    const keyword = searchQuery.toLowerCase().replace(/\s+/g, "");
-    const matched = products
-      .filter((p) => {
-        const normalize = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
-        return (
-          normalize(p.title).includes(keyword) ||
-          normalize(p.category?.name).includes(keyword) ||
-          normalize(p.subcategory?.name).includes(keyword) ||
-          (p.sku && normalize(p.sku).includes(keyword)) // Add SKU search
-        );
-      })
-      .slice(0, 5)
-      .map((p) => p.title);
-    
-    // Sort suggestions to prioritize exact matches
-    const sortedSuggestions = [...new Set([...matched, ...recentSearches])]
-      .slice(0, 5)
-      .sort((a, b) => {
-        const aLower = a.toLowerCase();
-        const bLower = b.toLowerCase();
-        
-        // Prioritize exact matches
-        if (aLower === keyword) return -1;
-        if (bLower === keyword) return 1;
-        
-        // Prioritize starts with
-        if (aLower.startsWith(keyword)) return -1;
-        if (bLower.startsWith(keyword)) return 1;
-        
-        return 0;
-      });
+  // Update search query and suggestions immediately
+  const handleSearchChange = (value) => {
+    setSearchQuery(value);
+    if (value.trim()) {
+      // Update suggestions immediately
+      const keyword = value.toLowerCase().replace(/\s+/g, "");
+      const matched = products
+        .filter((p) => {
+          const normalize = (s) => (s || "").toLowerCase().replace(/\s+/g, "");
+          return (
+            normalize(p.title).includes(keyword) ||
+            normalize(p.category?.name).includes(keyword) ||
+            normalize(p.subcategory?.name).includes(keyword) ||
+            (p.sku && normalize(p.sku).includes(keyword))
+          );
+        })
+        .slice(0, 5)
+        .map((p) => p.title);
       
-    setSuggestions(sortedSuggestions);
-  }, [searchQuery, products]);
+      // Sort suggestions to prioritize exact matches
+      const sortedSuggestions = [...new Set([...matched, ...recentSearches])]
+        .slice(0, 5)
+        .sort((a, b) => {
+          const aLower = a.toLowerCase();
+          const bLower = b.toLowerCase();
+          
+          // Prioritize exact matches
+          if (aLower === keyword) return -1;
+          if (bLower === keyword) return 1;
+          
+          // Prioritize starts with
+          if (aLower.startsWith(keyword)) return -1;
+          if (bLower.startsWith(keyword)) return 1;
+          
+          return 0;
+        });
+        
+      setSuggestions(sortedSuggestions);
+    } else {
+      setSuggestions([]);
+    }
+  };
 
   // ✅ Logout
   const handleLogout = async () => {
@@ -280,8 +283,7 @@ export default function Navbar() {
                 className="bg-transparent flex-1 outline-none text-sm md:text-base"
                 value={searchQuery}
                 onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  if (e.target.value.trim()) setSuggestions(recentSearches);
+                  handleSearchChange(e.target.value);
                 }}
                 onFocus={() => {
                   if (searchQuery.trim()) setSuggestions(recentSearches);
@@ -308,7 +310,7 @@ export default function Navbar() {
                     key={idx}
                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
                     onClick={() => {
-                      setSearchQuery(item);
+                      handleSearchChange(item);
                       performSearch(item);
                       setSuggestions([]);
                     }}
@@ -466,8 +468,7 @@ export default function Navbar() {
               className="bg-transparent flex-1 outline-none text-base"
               value={searchQuery}
               onChange={(e) => {
-                setSearchQuery(e.target.value);
-                if (e.target.value.trim()) setSuggestions(recentSearches);
+                handleSearchChange(e.target.value);
               }}
               onFocus={() => {
                 if (searchQuery.trim()) setSuggestions(recentSearches);
@@ -490,7 +491,7 @@ export default function Navbar() {
                   key={idx}
                   className="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm text-gray-700"
                   onClick={() => {
-                    setSearchQuery(item);
+                    handleSearchChange(item);
                     performSearch(item);
                     setSuggestions([]);
                   }}

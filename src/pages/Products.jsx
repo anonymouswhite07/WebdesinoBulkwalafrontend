@@ -18,11 +18,12 @@ const Products = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const subcategoryFromURL = params.get("subcategory");
+  const searchFromURL = params.get("search");
 
   const [filters, setFilters] = useState({
     category: "",
     subcategory: subcategoryFromURL || "",
-    search: "",
+    search: searchFromURL || "",
     minPrice: 0,
     maxPrice: 10000,
     page: 1,
@@ -37,25 +38,49 @@ const Products = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // fetchCategories is stable from zustand store
 
-  // ✅ Update filter when user navigates with ?subcategory=Name
+  // ✅ Update filter when user navigates with ?subcategory=Name or ?search=query
   useEffect(() => {
-    if (subcategoryFromURL) {
-      setFilters((prev) => ({ ...prev, subcategory: subcategoryFromURL }));
+    const newFilters = { ...filters };
+    let shouldUpdate = false;
+    
+    if (subcategoryFromURL && subcategoryFromURL !== filters.subcategory) {
+      newFilters.subcategory = subcategoryFromURL;
+      shouldUpdate = true;
     }
-  }, [subcategoryFromURL]);
+    
+    if (searchFromURL !== filters.search) {
+      newFilters.search = searchFromURL || "";
+      shouldUpdate = true;
+    }
+    
+    if (shouldUpdate) {
+      setFilters(newFilters);
+    }
+  }, [subcategoryFromURL, searchFromURL]);
 
   // Fetch products when filters change
   useEffect(() => {
-    const delay = setTimeout(() => {
+    // For search queries, don't debounce to ensure instant results
+    if (filters.search) {
       fetchProducts(filters);
-    }, 300); // wait 300ms after typing stops
+    } else {
+      // For other filters, use debounce to avoid too many requests
+      const delay = setTimeout(() => {
+        fetchProducts(filters);
+      }, 300); // wait 300ms after typing stops
 
-    return () => clearTimeout(delay);
+      return () => clearTimeout(delay);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]); // fetchProducts is stable from zustand store
 
   const handleFilterChange = (key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
+  };
+
+  // Handle search input changes immediately
+  const handleSearchChange = (value) => {
+    setFilters((prev) => ({ ...prev, search: value, page: 1 }));
   };
 
   const totalPages = Math.ceil(total / limit) || 1;
@@ -98,7 +123,7 @@ const Products = () => {
               id="search"
               placeholder="Search products..."
               value={filters.search}
-              onChange={(e) => handleFilterChange("search", e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="text-sm sm:text-base"
             />
           </div>
