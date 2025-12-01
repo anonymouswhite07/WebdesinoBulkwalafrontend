@@ -28,12 +28,6 @@ if (typeof window !== 'undefined' && window.location.protocol === 'https:' && ba
 export const axiosInstance = axios.create({
   baseURL,
   withCredentials: true, // IMPORTANT: allows sending cookies
-  // Add additional config for mobile Safari
-  headers: {
-    'Cache-Control': 'no-cache',
-    'Pragma': 'no-cache',
-    'Expires': '0',
-  },
   // Add timeout to prevent hanging requests
   timeout: 30000, // 30 seconds
 });
@@ -51,8 +45,8 @@ axiosInstance.interceptors.request.use(
       });
     }
     
-    // For Safari, ensure we're not using cached requests
-    if (isSafari) {
+    // For Safari, ensure we're not using cached requests (only for GET requests)
+    if (isSafari && config.method?.toUpperCase() === 'GET') {
       config.headers['Cache-Control'] = 'no-cache';
       config.headers['Pragma'] = 'no-cache';
     }
@@ -171,19 +165,8 @@ const safariRetryWrapper = (originalMethod) => {
   return async function (...args) {
     const [url, data, config = {}] = args;
     
-    // Add specific config for Safari
-    const safariConfig = {
-      ...config,
-      // Force new connection for Safari
-      headers: {
-        ...config.headers,
-        'Connection': 'keep-alive',
-        'Keep-Alive': 'timeout=5, max=100'
-      }
-    };
-    
     try {
-      return await originalMethod.call(this, url, data, safariConfig);
+      return await originalMethod.call(this, url, data, config);
     } catch (error) {
       // If it's a network error on Safari, try once more
       if ((isIOS || isSafari) && 
@@ -197,7 +180,7 @@ const safariRetryWrapper = (originalMethod) => {
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         try {
-          return await originalMethod.call(this, url, data, safariConfig);
+          return await originalMethod.call(this, url, data, config);
         } catch (retryError) {
           console.error("Retry failed:", retryError.message);
           throw retryError;
