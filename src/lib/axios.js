@@ -132,7 +132,19 @@ axiosInstance.interceptors.response.use(
         console.error("Token refresh failed:", err.message);
         processQueue(err, null);
         
-        // Instead of rejecting, we'll redirect to login
+        // Check if the error is due to missing cookies (user not logged in)
+        const isMissingCookies = err.response?.status === 401 && 
+          (err.response?.data?.message?.includes("No refresh token") || 
+           err.response?.data?.message?.includes("Unauthorized request"));
+        
+        // If it's a missing cookies issue, don't redirect to login as the user might be a guest
+        // Just reject the promise and let the calling code handle it appropriately
+        if (isMissingCookies) {
+          console.log("User not logged in - continuing as guest");
+          return Promise.reject(err);
+        }
+        
+        // For other refresh token failures, redirect to login
         if (typeof window !== 'undefined') {
           // Only redirect if we're not already on the login page
           if (window.location.pathname !== '/login') {
