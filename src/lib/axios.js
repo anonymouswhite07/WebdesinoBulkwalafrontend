@@ -158,3 +158,61 @@ axiosInstance.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// SPECIAL FIX FOR SAFARI NETWORK ERRORS
+// Add a retry mechanism specifically for Safari network errors
+const originalPost = axiosInstance.post;
+const originalGet = axiosInstance.get;
+const originalPut = axiosInstance.put;
+const originalDelete = axiosInstance.delete;
+
+// Wrapper function to add retry logic for Safari
+const safariRetryWrapper = (originalMethod) => {
+  return async function (...args) {
+    const [url, data, config = {}] = args;
+    
+    // Add specific config for Safari
+    const safariConfig = {
+      ...config,
+      // Force new connection for Safari
+      headers: {
+        ...config.headers,
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=5, max=100'
+      }
+    };
+    
+    try {
+      return await originalMethod.call(this, url, data, safariConfig);
+    } catch (error) {
+      // If it's a network error on Safari, try once more
+      if ((isIOS || isSafari) && 
+          (error.code === 'NETWORK_ERROR' || 
+           error.message.includes('Network Error') ||
+           error.message.includes('Failed to fetch'))) {
+        
+        console.log("Safari network error detected, retrying once...");
+        
+        // Wait a bit before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        try {
+          return await originalMethod.call(this, url, data, safariConfig);
+        } catch (retryError) {
+          console.error("Retry failed:", retryError.message);
+          throw retryError;
+        }
+      }
+      
+      throw error;
+    }
+  };
+};
+
+// Apply retry wrapper to all methods for Safari
+if (isIOS || isSafari) {
+  axiosInstance.post = safariRetryWrapper(originalPost);
+  axiosInstance.get = safariRetryWrapper(originalGet);
+  axiosInstance.put = safariRetryWrapper(originalPut);
+  axiosInstance.delete = safariRetryWrapper(originalDelete);
+}

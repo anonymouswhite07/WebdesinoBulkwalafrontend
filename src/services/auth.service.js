@@ -14,26 +14,116 @@ export const registerSellerService = async (sellerData) => {
 };
 
 export const loginService = async (credentials) => {
-  const res = await axiosInstance.post("/users/login", credentials, {
-    withCredentials: true,
-  });
-  return res.data.data;
+  try {
+    const res = await axiosInstance.post("/users/login", credentials, {
+      withCredentials: true,
+    });
+    return res.data.data;
+  } catch (error) {
+    // Special handling for Safari network errors
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if ((isIOS || isSafari) && 
+        (error.code === 'NETWORK_ERROR' || 
+         error.message.includes('Network Error') ||
+         error.message.includes('Failed to fetch'))) {
+      
+      console.log("Safari network error detected in loginService, retrying once...");
+      
+      // Wait a bit before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Retry once
+      try {
+        const res = await axiosInstance.post("/users/login", credentials, {
+          withCredentials: true,
+        });
+        return res.data.data;
+      } catch (retryError) {
+        console.error("Login retry failed:", retryError.message);
+        throw retryError;
+      }
+    }
+    
+    throw error;
+  }
 };
 
 // Send OTP
 export const sendOtpService = async (phone) => {
-  const res = await axiosInstance.post("/users/send-otp", { phone }, {
-    withCredentials: true,
-  });
-  return res.data;
+  try {
+    const res = await axiosInstance.post("/users/send-otp", { phone }, {
+      withCredentials: true,
+    });
+    return res.data;
+  } catch (error) {
+    // Special handling for Safari network errors
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if ((isIOS || isSafari) && 
+        (error.code === 'NETWORK_ERROR' || 
+         error.message.includes('Network Error') ||
+         error.message.includes('Failed to fetch'))) {
+      
+      console.log("Safari network error detected in sendOtpService, retrying once...");
+      
+      // Wait a bit before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Retry once
+      try {
+        const res = await axiosInstance.post("/users/send-otp", { phone }, {
+          withCredentials: true,
+        });
+        return res.data;
+      } catch (retryError) {
+        console.error("Send OTP retry failed:", retryError.message);
+        throw retryError;
+      }
+    }
+    
+    throw error;
+  }
 };
 
 // Verify OTP
 export const verifyOtpService = async (data) => {
-  const res = await axiosInstance.post("/users/verify-otp", data, {
-    withCredentials: true,
-  });
-  return res.data.data; // returns user
+  try {
+    const res = await axiosInstance.post("/users/verify-otp", data, {
+      withCredentials: true,
+    });
+    return res.data.data; // returns user
+  } catch (error) {
+    // Special handling for Safari network errors
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if ((isIOS || isSafari) && 
+        (error.code === 'NETWORK_ERROR' || 
+         error.message.includes('Network Error') ||
+         error.message.includes('Failed to fetch'))) {
+      
+      console.log("Safari network error detected in verifyOtpService, retrying once...");
+      
+      // Wait a bit before retry
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Retry once
+      try {
+        const res = await axiosInstance.post("/users/verify-otp", data, {
+          withCredentials: true,
+        });
+        return res.data.data;
+      } catch (retryError) {
+        console.error("Verify OTP retry failed:", retryError.message);
+        throw retryError;
+      }
+    }
+    
+    throw error;
+  }
 };
 
 export const updateShippingAddressService = async ({ address, index }) => {
