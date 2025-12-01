@@ -3,10 +3,16 @@ import axios from "axios";
 // Detect if we're on iOS/Safari
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 const isSafari = typeof navigator !== 'undefined' && /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
 
 // Log environment info for debugging
-if (isIOS || isSafari) {
-  console.log("Axios config: Detected iOS/Safari environment");
+if (isIOS || isSafari || isMobile) {
+  console.log("Axios config: Detected mobile/iOS/Safari environment", {
+    isIOS,
+    isSafari,
+    isMobile,
+    userAgent: navigator.userAgent
+  });
 }
 
 // Determine base URL with protocol awareness for mobile
@@ -46,11 +52,13 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
     
     // Log errors for iOS/Safari debugging
-    if (isIOS || isSafari) {
+    if (isIOS || isSafari || isMobile) {
       console.log("Axios interceptor: Request failed", {
         url: originalRequest?.url,
         status: error.response?.status,
-        message: error.message
+        message: error.message,
+        isRetry: originalRequest._retry,
+        isRefreshTokenRequest: originalRequest.url?.includes('/users/refresh-token')
       });
     }
 
@@ -73,10 +81,16 @@ axiosInstance.interceptors.response.use(
 
       try {
         // Call refresh endpoint — COOKIE will be used automatically
+        if (isIOS || isSafari || isMobile) {
+          console.log("Axios interceptor: Attempting to refresh token");
+        }
+        
         const { data } = await axiosInstance.post("/users/refresh-token", {}, { withCredentials: true });
         
         const newAccessToken = data?.data?.accessToken;
-        if (!newAccessToken) throw new Error("No access token returned!");
+        if (!newAccessToken) {
+          throw new Error("No access token returned!");
+        }
 
         // Process queued requests with new token
         processQueue(null, newAccessToken);
@@ -90,7 +104,11 @@ axiosInstance.interceptors.response.use(
         
         // Instead of rejecting, we'll redirect to login
         if (typeof window !== 'undefined') {
-          window.location.href = '/login';
+          // Only redirect if we're not already on the login page
+          if (window.location.pathname !== '/login') {
+            console.log("Redirecting to login due to token refresh failure");
+            window.location.href = '/login';
+          }
         }
         return Promise.reject(err);
       } finally {

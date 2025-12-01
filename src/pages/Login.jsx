@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import {
   Form,
@@ -20,20 +20,35 @@ import { LoginSchema } from "@/schemas/userSchema.js";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const login = useAuthStore((s) => s.login);
   const sendOtp = useAuthStore((s) => s.otpLoginSend);
   const verifyOtp = useAuthStore((s) => s.otpLoginVerify);
+  const isLoggedIn = useAuthStore((s) => s.isLoggedIn);
   const [loginMode, setLoginMode] = useState("email");
   const [otpSent, setOtpSent] = useState(false);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
 
   // Email Login form
   const form = useForm({
     resolver: zodResolver(LoginSchema),
     defaultValues: { email: "", password: "" },
   });
+
+  // Check if user is already logged in
+  useEffect(() => {
+    // Only run this check once
+    if (!hasCheckedAuth) {
+      setHasCheckedAuth(true);
+      if (isLoggedIn) {
+        // User is already logged in, redirect to home
+        navigate("/", { replace: true });
+      }
+    }
+  }, [isLoggedIn, navigate, hasCheckedAuth]);
 
   // Submit for Email Login
   const onSubmit = async (values) => {

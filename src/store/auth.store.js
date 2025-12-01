@@ -227,7 +227,11 @@ export const useAuthStore = create((set, get) => ({
       }
     } catch (error) {
       console.error("Auth check failed:", error.message);
-      set({ user: null, isLoggedIn: false });
+      // Only set user to null if it's not already null to prevent unnecessary state changes
+      const currentState = get();
+      if (currentState.user !== null || currentState.isLoggedIn !== false) {
+        set({ user: null, isLoggedIn: false });
+      }
     } finally {
       set({ isLoading: false });
     }
