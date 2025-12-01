@@ -15,14 +15,11 @@ if (isIOS || isSafari || isMobile) {
   });
 }
 
-// Determine base URL with protocol awareness for mobile
-let baseURL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+// Use the VITE_API_BASE_URL environment variable - no fallback to localhost
+const baseURL = import.meta.env.VITE_API_BASE_URL;
 
-// On iOS/Safari, ensure we're using HTTPS if the current page is HTTPS
-if (typeof window !== 'undefined' && window.location.protocol === 'https:' && baseURL.startsWith('http:')) {
-  console.log("Axios config: Upgrading to HTTPS for secure context");
-  baseURL = baseURL.replace('http:', 'https:');
-}
+// Log the baseURL for debugging
+console.log("Axios config: Using baseURL:", baseURL);
 
 // Enhanced axios configuration for Safari compatibility
 export const axiosInstance = axios.create({
