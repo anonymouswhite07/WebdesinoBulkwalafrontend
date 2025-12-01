@@ -3,6 +3,7 @@ import { useProductStore } from "@/store/product.store";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, Autoplay } from "swiper/modules";
 import { useNavigate } from "react-router-dom";
+import { ResponsiveCard, ResponsiveText } from "@/components/ResponsiveUtils";
 
 export default function RecentProductsCarousel() {
   const { products, fetchProducts, loading, error } = useProductStore();
@@ -14,30 +15,30 @@ export default function RecentProductsCarousel() {
 
   if (loading)
     return (
-      <div className="flex justify-center py-12 sm:py-16 text-gray-500 text-sm sm:text-base">
+      <div className="flex justify-center py-12 sm:py-16 text-gray-500 responsive-text sm:responsive-text-lg">
         Loading latest products...
       </div>
     );
 
   if (error)
     return (
-      <div className="flex justify-center py-12 sm:py-16 text-red-500 text-sm sm:text-base">
+      <div className="flex justify-center py-12 sm:py-16 text-red-500 responsive-text sm:responsive-text-lg">
         Failed to load products.
       </div>
     );
 
   if (!products || products.length === 0)
     return (
-      <div className="flex justify-center py-12 sm:py-16 text-gray-500 text-sm sm:text-base">
+      <div className="flex justify-center py-12 sm:py-16 text-gray-500 responsive-text sm:responsive-text-lg">
         No products found.
       </div>
     );
 
   return (
-    <section className="relative max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-6 sm:py-10">
+    <section className="relative w-full px-3 sm:px-4 lg:px-6 py-6 sm:py-10">
       {/* ✅ Header */}
       <div className="flex justify-between items-center mb-4 sm:mb-8">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-800">
+        <h2 className="responsive-text-lg sm:responsive-text-xl md:responsive-text-2xl font-semibold text-gray-800">
           Newly Launched Products
         </h2>
         <div className="hidden sm:block h-[2px] w-16 sm:w-24 bg-[#02066F]" />
@@ -47,13 +48,13 @@ export default function RecentProductsCarousel() {
       <div className="relative overflow-visible">
         <Swiper
           modules={[Navigation, Pagination, Autoplay]}
-          spaceBetween={15}
+          spaceBetween={10}
           slidesPerView={1}
           breakpoints={{
-            480: { slidesPerView: 2, spaceBetween: 20 },
-            768: { slidesPerView: 3, spaceBetween: 25 },
-            1024: { slidesPerView: 4, spaceBetween: 30 },
-            1280: { slidesPerView: 5, spaceBetween: 35 },
+            480: { slidesPerView: 2, spaceBetween: 15 },
+            768: { slidesPerView: 3, spaceBetween: 20 },
+            1024: { slidesPerView: 4, spaceBetween: 25 },
+            1280: { slidesPerView: 5, spaceBetween: 30 },
           }}
           autoplay={{ delay: 3000, disableOnInteraction: false }}
           pagination={{ clickable: true, dynamicBullets: true }}
@@ -63,23 +64,16 @@ export default function RecentProductsCarousel() {
         >
           {products.slice(0, 10).map((product) => (
             <SwiperSlide key={product._id}>
-              <div
-                className="
-                  bg-white rounded-lg shadow-sm hover:shadow-md 
-                  transition-all duration-300 
-                  overflow-hidden group cursor-pointer 
-                  border border-gray-100 flex flex-col 
-                  h-[300px] sm:h-[340px] md:h-[380px]
-                "
-              >
+              <ResponsiveCard className="h-[280px] sm:h-[320px] md:h-[360px] lg:h-[380px] flex flex-col">
                 {/* 🔹 Image Section */}
                 <div
                   className="
                     relative w-full 
-                    h-[150px] sm:h-[170px] md:h-[200px] 
+                    h-[140px] sm:h-[160px] md:h-[180px] lg:h-[200px] 
                     bg-gray-50 
                     overflow-hidden 
                     flex items-center justify-center
+                    cursor-pointer
                   "
                   onClick={() => navigate(`/product/${product.slug}`)}
                 >
@@ -99,15 +93,15 @@ export default function RecentProductsCarousel() {
 
                 {/* 🔹 Product Info */}
                 <div className="p-3 sm:p-4 flex flex-col justify-between flex-grow">
-                  <h3 className="text-sm sm:text-base font-semibold text-gray-800 line-clamp-1">
+                  <h3 className="responsive-text-sm sm:responsive-text-base font-semibold text-gray-800 line-clamp-1">
                     {product.title}
                   </h3>
-                  <p className="text-xs sm:text-sm text-gray-500 line-clamp-2 mt-1">
+                  <p className="responsive-text-xs sm:responsive-text-sm text-gray-500 line-clamp-2 mt-1">
                     {product.description?.slice(0, 60) || "No description"}
                   </p>
 
                   <div className="flex justify-between items-center mt-2 sm:mt-3">
-                    <span className="text-sm sm:text-lg font-bold text-[#02066F]">
+                    <span className="responsive-text-sm sm:responsive-text-lg font-bold text-[#02066F]">
                       ₹
                       {product.discountPrice && product.discountPrice > 0
                         ? product.discountPrice
@@ -117,15 +111,16 @@ export default function RecentProductsCarousel() {
                     <button
                       onClick={() => navigate(`/product/${product.slug}`)}
                       className="
-                        text-xs sm:text-sm font-semibold text-yellow-500 
+                        responsive-text-xs sm:responsive-text-sm font-semibold text-yellow-500 
                         hover:text-yellow-400 transition-colors
+                        touch-friendly
                       "
                     >
                       View Details ›
                     </button>
                   </div>
                 </div>
-              </div>
+              </ResponsiveCard>
             </SwiperSlide>
           ))}
         </Swiper>
