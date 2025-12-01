@@ -124,11 +124,11 @@ const Products = () => {
   };
   
   // Filter products based on search query using scoring
-  const scoredProducts = getScoredProducts(productList, filters.search);
-  // If there's only one high-scoring result, show only that one
-  const filteredProducts = scoredProducts.length === 1 && scoredProducts[0]._searchScore > 0 
-    ? [scoredProducts[0]] 
-    : scoredProducts.filter(p => p._searchScore > 0 || !filters.search);
+  const scoredProducts = getScoredProducts(products, filters.search);
+  // Show only products with positive scores when searching
+  const filteredProducts = filters.search 
+    ? scoredProducts.filter(p => p._searchScore > 0)
+    : scoredProducts;
 
   return (
     <div className="flex flex-col h-screen">
