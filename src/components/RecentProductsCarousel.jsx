@@ -13,6 +13,9 @@ export default function RecentProductsCarousel() {
     fetchProducts({ limit: 10, sort: "-createdAt" });
   }, [fetchProducts]);
 
+  // ✅ Add a check for mobile view to ensure proper rendering
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   if (loading)
     return (
       <div className="flex justify-center py-12 sm:py-16 text-gray-500 responsive-text sm:responsive-text-lg">
@@ -49,7 +52,7 @@ export default function RecentProductsCarousel() {
         <Swiper
           modules={[Navigation, Pagination, Autoplay]}
           spaceBetween={10}
-          slidesPerView={1}
+          slidesPerView={isMobile ? 1 : 1} // ✅ Ensure at least 1 slide on mobile
           breakpoints={{
             480: { slidesPerView: 2, spaceBetween: 15 },
             768: { slidesPerView: 3, spaceBetween: 20 },
@@ -88,6 +91,8 @@ export default function RecentProductsCarousel() {
                       group-hover:scale-105 
                       transition-transform duration-300
                     "
+                    // ✅ Add loading attribute for better performance
+                    loading="lazy"
                   />
                 </div>
 
