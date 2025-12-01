@@ -29,8 +29,7 @@ export default function SignupPopup() {
   const navigate = useNavigate();
   const location = useLocation();
   const firstTimerRef = useRef(null);
-  const repeatTimerRef = useRef(null);
-  const popupCountRef = useRef(0); // Track popup count
+  const hasShownRef = useRef(false); // Track if popup has been shown
 
   const form = useForm({
     resolver: zodResolver(SignupSchema),
@@ -39,13 +38,13 @@ export default function SignupPopup() {
 
   useEffect(() => {
     if (firstTimerRef.current) clearTimeout(firstTimerRef.current);
-    if (repeatTimerRef.current) clearInterval(repeatTimerRef.current);
 
     const isAuthPage =
       location.pathname.includes("/login") ||
       location.pathname.includes("/signup") ||
       location.pathname.includes("/verify");
 
+    // Don't show popup if user is logged in or on auth pages
     if (user?._id || isAuthPage) {
       setOpen(false);
       if (import.meta.NODE_ENV === "development") {
@@ -54,57 +53,33 @@ export default function SignupPopup() {
       return;
     }
 
+    // Don't show popup if it has already been shown
+    if (hasShownRef.current) {
+      if (import.meta.NODE_ENV === "development") {
+        console.log("Popup already shown once, not showing again");
+      }
+      return;
+    }
+
     if (import.meta.NODE_ENV === "development") {
       console.log("Popup scheduled to open in 15 seconds...");
     }
+    
     firstTimerRef.current = setTimeout(() => {
       if (import.meta.NODE_ENV === "development") {
         console.log("Popup opened (15s delay)");
       }
       setOpen(true);
-      popupCountRef.current = 1; // First popup shown
-
-      if (import.meta.NODE_ENV === "development") {
-        console.log("Setting repeat popup every 2 minutes...");
-      }
-      repeatTimerRef.current = setInterval(() => {
-        const stillValid =
-          !user?._id &&
-          !(
-            location.pathname.includes("/login") ||
-            location.pathname.includes("/signup")
-          );
-        
-        // Check if we've shown the popup twice already
-        if (popupCountRef.current >= 2) {
-          if (import.meta.NODE_ENV === "development") {
-            console.log("Maximum popup count reached. Forcing logout...");
-          }
-          // Force logout after 2 popups
-          useAuthStore.getState().logout();
-          clearInterval(repeatTimerRef.current);
-          return;
-        }
-        
-        if (stillValid) {
-          if (import.meta.NODE_ENV === "development") {
-            console.log(`Popup reopened (2-minute repeat). Count: ${popupCountRef.current + 1}`);
-          }
-          popupCountRef.current += 1;
-          setOpen(true);
-        } else {
-          if (import.meta.NODE_ENV === "development") {
-            console.log("Skipping popup (user logged in or on auth page)");
-          }
-        }
-      }, 120000);
+      hasShownRef.current = true; // Mark that popup has been shown
+      
+      // Clear the timer reference
+      firstTimerRef.current = null;
     }, 15000);
 
     return () => {
       if (firstTimerRef.current) clearTimeout(firstTimerRef.current);
-      if (repeatTimerRef.current) clearInterval(repeatTimerRef.current);
       if (import.meta.NODE_ENV === "development") {
-        console.log("Popup timers cleared");
+        console.log("Popup timer cleared");
       }
     };
   }, [location, user]);
