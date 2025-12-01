@@ -14,9 +14,9 @@ export default function CategorySlider({ category, defaultBanners }) {
     : activeBannerSet?.images?.length
     ? activeBannerSet.images
     : [
-        'https://ik.imagekit.io/bulkwala/Banner/Banner.png',
-        'https://ik.imagekit.io/bulkwala/Banner/Phone%20Cover%20Banner.png',
-        'https://ik.imagekit.io/bulkwala/Banner/Accessories.png',
+        'https://ik.imagekit.io/bulkwala/demo/bannerimg1.png?updatedAt=1762846061563',
+        'https://ik.imagekit.io/bulkwala/demo/bannerimg2.png?updatedAt=1762846061703',
+        'https://ik.imagekit.io/bulkwala/demo/bannerimg3.png?updatedAt=1762846062182',
       ];
 
   // Filter out failed images
